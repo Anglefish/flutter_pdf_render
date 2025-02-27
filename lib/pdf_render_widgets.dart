@@ -6,8 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:vector_math/vector_math_64.dart' as math64;
 
 import 'pdf_render.dart';
-import 'src/wrappers/pdf_texture.dart';
 import 'src/interfaces/interactive_viewer.dart' as iv;
+import 'src/wrappers/pdf_texture.dart';
 
 /// Function definition to build widget tree for a PDF document.
 ///
@@ -170,13 +170,13 @@ class PdfDocumentLoader extends StatefulWidget {
   /// or [PdfDocumentLoader.openData] in normal case.
   /// If you already have [PdfDocument], you can use the method.
   PdfDocumentLoader({
-    Key? key,
+    super.key,
     required this.doc,
     this.documentBuilder,
     this.pageNumber,
     this.pageBuilder,
     this.onError,
-  }) : super(key: key);
+  });
 
   @override
   PdfDocumentLoaderState createState() => PdfDocumentLoaderState();
@@ -289,8 +289,10 @@ class PdfPageView extends StatefulWidget {
   final PdfPageBuilder? pageBuilder;
 
   const PdfPageView(
-      {Key? key, this.pdfDocument, required this.pageNumber, this.pageBuilder})
-      : super(key: key);
+      {super.key,
+      this.pdfDocument,
+      required this.pageNumber,
+      this.pageBuilder});
 
   @override
   PdfPageViewState createState() => PdfPageViewState();
@@ -543,20 +545,50 @@ class PdfViewerController extends TransformationController {
   Size getFullSize(double zoomRatio) => _state!._docSize! * zoomRatio;
 
   /// Calculate maximum X that can be acceptable as a horizontal scroll position.
-  double getScrollableMaxX(double zoomRatio) =>
-      getFullSize(zoomRatio).width - _state!._lastViewSize!.width;
+  // double getScrollableMaxX(double zoomRatio) =>
+  //     getFullSize(zoomRatio).width - _state!._lastViewSize!.width;
+  double getScrollableMaxX(double zoomRatio) {
+    if (_state == null || _state!._lastViewSize == null) return 0.0;
+
+    double maxWidth =
+        getFullSize(zoomRatio).width - _state!._lastViewSize!.width;
+    return maxWidth.isNaN || maxWidth < 0.0 ? 0.0 : maxWidth;
+  }
 
   /// Calculate maximum Y that can be acceptable as a vertical scroll position.
-  double getScrollableMaxY(double zoomRatio) =>
-      getFullSize(zoomRatio).height - _state!._lastViewSize!.height;
+  // double getScrollableMaxY(double zoomRatio) =>
+  //     getFullSize(zoomRatio).height - _state!._lastViewSize!.height;
+  double getScrollableMaxY(double zoomRatio) {
+    if (_state == null || _state!._lastViewSize == null) return 0.0;
+
+    double maxY = getFullSize(zoomRatio).height - _state!._lastViewSize!.height;
+    if (maxY.isNaN || maxY < 0.0) {
+      maxY = 0.0; // Prevent invalid values
+    }
+    return maxY;
+  }
 
   /// Clamp horizontal scroll position into valid range.
-  double clampX(double x, double zoomRatio) =>
-      x.clamp(0.0, getScrollableMaxX(zoomRatio));
+  // double clampX(double x, double zoomRatio) =>
+  //     x.clamp(0.0, getScrollableMaxX(zoomRatio));
+  double clampX(double x, double zoomRatio) {
+    double maxX = getScrollableMaxX(zoomRatio);
+    if (maxX.isNaN || maxX < 0.0) {
+      maxX = 0.0; // Prevent invalid clamping
+    }
+    return x.clamp(0.0, maxX);
+  }
 
   /// Clamp vertical scroll position into valid range.
-  double clampY(double y, double zoomRatio) =>
-      y.clamp(0.0, getScrollableMaxY(zoomRatio));
+  // double clampY(double y, double zoomRatio) =>
+  //     y.clamp(0.0, getScrollableMaxY(zoomRatio));
+  double clampY(double y, double zoomRatio) {
+    double maxY = getScrollableMaxY(zoomRatio);
+    if (maxY.isNaN || maxY < 0.0) {
+      maxY = 0.0; // Prevent invalid clamping
+    }
+    return y.clamp(0.0, maxY);
+  }
 
   /// Calculate the matrix that corresponding to the page position.
   ///
@@ -899,7 +931,8 @@ class PdfViewerParams {
         onViewerControllerInitialized:
             onViewerControllerInitialized ?? this.onViewerControllerInitialized,
         scrollByMouseWheel: scrollByMouseWheel ?? this.scrollByMouseWheel,
-        onClickOutSidePageViewer: onClickOutSidePageViewer ?? this.onClickOutSidePageViewer,
+        onClickOutSidePageViewer:
+            onClickOutSidePageViewer ?? this.onClickOutSidePageViewer,
       );
 
   @override
@@ -974,12 +1007,12 @@ class PdfViewer extends StatefulWidget {
   Future<PdfDocument?> get _doc => _docCache.getValue();
 
   PdfViewer({
-    Key? key,
+    super.key,
     required this.doc,
     this.viewerController,
     this.params,
     this.onError,
-  }) : super(key: key);
+  });
 
   /// Open a file.
   factory PdfViewer.openFile(
@@ -1230,9 +1263,8 @@ class PdfViewerState extends State<PdfViewer>
           transformationController: _controller,
           constrained: false,
           panAxis: widget.params?.panAxis ?? PanAxis.free,
-          onWheelDelta: widget.params?.scrollByMouseWheel != null
-              ? _onWheelDelta
-              : null,
+          onWheelDelta:
+              widget.params?.scrollByMouseWheel != null ? _onWheelDelta : null,
           boundaryMargin: widget.params?.boundaryMargin ?? EdgeInsets.zero,
           minScale: widget.params?.minScale ?? 0.8,
           maxScale: widget.params?.maxScale ?? 2.5,
